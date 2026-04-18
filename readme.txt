@@ -1,3 +1,6 @@
-Este repo corresponde al microservicio del Kong API Gateway, el cual ya tiene configurado algunas cosas respectoa a
-comunicacion y ejecucion a nivel de infraestructura en el repo de 'IaC' pero no tiene configurado el ruteo hacia los
-debidos microservicios cuando lleguen solicitudes.
+Este repo corresponde al microservicio del Kong API Gateway.
+
+La IaC ya define su contrato de infraestructura (Fargate, ALB, SG, DB-less y Service Discovery).
+Este repositorio contiene la implementacion runtime (Dockerfile, entrypoint y config declarativa de rutas).
+
+Ver README.md para detalles operativos y de despliegue.
