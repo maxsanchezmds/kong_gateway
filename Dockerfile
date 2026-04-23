@@ -33,7 +33,7 @@ USER kong
 
 ENV KONG_DATABASE=off \
     KONG_DECLARATIVE_CONFIG=/tmp/kong.generated.yml \
-    KONG_PROXY_LISTEN=0.0.0.0:8000 reuseport backlog=16384 \
+    KONG_PROXY_LISTEN="0.0.0.0:8000 reuseport backlog=16384" \
     KONG_ADMIN_LISTEN=off \
     KONG_STATUS_LISTEN=off \
     KONG_NGINX_WORKER_PROCESSES=auto
