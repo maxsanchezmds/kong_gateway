@@ -75,6 +75,29 @@ next_available_priority() {
   echo "$priority"
 }
 
+wait_for_target_group_association() {
+  local target_group_arn="$1"
+  local load_balancer_arn="$2"
+  local max_attempts="${TARGET_GROUP_ASSOCIATION_MAX_ATTEMPTS:-20}"
+  local sleep_seconds="${TARGET_GROUP_ASSOCIATION_SLEEP_SECONDS:-3}"
+  local attempt
+  local is_associated
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    is_associated="$(aws elbv2 describe-target-groups --target-group-arns "$target_group_arn" --output json \
+      | jq -r --arg lb "$load_balancer_arn" '.TargetGroups[0].LoadBalancerArns // [] | index($lb) != null')"
+
+    if [[ "$is_associated" == "true" ]]; then
+      return 0
+    fi
+
+    sleep "$sleep_seconds"
+  done
+
+  echo "Target group ${target_group_arn} was not associated with load balancer ${load_balancer_arn} within ${max_attempts} attempts." >&2
+  return 1
+}
+
 require_env AWS_REGION
 require_env PR_NUMBER
 require_env IMAGE_URI
@@ -95,6 +118,7 @@ VPC_ID="$(get_param vpc_id)"
 CONTAINER_NAME="$(get_param container_name)"
 CONTAINER_PORT="$(get_param container_port)"
 CLOUDMAP_NAMESPACE_NAME="$(get_param cloudmap_namespace_name)"
+LB_ARN="$(aws elbv2 describe-listeners --listener-arns "$LISTENER_ARN" --query 'Listeners[0].LoadBalancerArn' --output text)"
 
 PROD_TASK_DEFINITION_ARN="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$PROD_SERVICE_NAME" --query 'services[0].taskDefinition' --output text)"
 BASE_TASK_DEFINITION_JSON="$(aws ecs describe-task-definition --task-definition "$PROD_TASK_DEFINITION_ARN" --query 'taskDefinition' --output json)"
@@ -122,6 +146,20 @@ if [[ -z "$TARGET_GROUP_ARN" || "$TARGET_GROUP_ARN" == "None" ]]; then
     --output text)"
 fi
 
+RULE_ARN="$(find_listener_rule_by_host || true)"
+if [[ -n "$RULE_ARN" ]]; then
+  aws elbv2 modify-rule --rule-arn "$RULE_ARN" --actions "Type=forward,TargetGroupArn=${TARGET_GROUP_ARN}" >/dev/null
+else
+  PRIORITY="$(next_available_priority)"
+  aws elbv2 create-rule \
+    --listener-arn "$LISTENER_ARN" \
+    --priority "$PRIORITY" \
+    --conditions "Field=host-header,HostHeaderConfig={Values=[\"${PREVIEW_HOST}\"]}" \
+    --actions "Type=forward,TargetGroupArn=${TARGET_GROUP_ARN}" >/dev/null
+fi
+
+wait_for_target_group_association "$TARGET_GROUP_ARN" "$LB_ARN"
+
 SUBNETS_COMPACT="${PRIVATE_SUBNET_IDS_CSV// /}"
 NETWORK_CONFIGURATION="awsvpcConfiguration={subnets=[${SUBNETS_COMPACT}],securityGroups=[${SECURITY_GROUP_ID}],assignPublicIp=DISABLED}"
 
@@ -147,21 +185,8 @@ else
     --health-check-grace-period-seconds 60 >/dev/null
 fi
 
-RULE_ARN="$(find_listener_rule_by_host || true)"
-if [[ -n "$RULE_ARN" ]]; then
-  aws elbv2 modify-rule --rule-arn "$RULE_ARN" --actions "Type=forward,TargetGroupArn=${TARGET_GROUP_ARN}" >/dev/null
-else
-  PRIORITY="$(next_available_priority)"
-  aws elbv2 create-rule \
-    --listener-arn "$LISTENER_ARN" \
-    --priority "$PRIORITY" \
-    --conditions "Field=host-header,HostHeaderConfig={Values=[\"${PREVIEW_HOST}\"]}" \
-    --actions "Type=forward,TargetGroupArn=${TARGET_GROUP_ARN}" >/dev/null
-fi
-
 aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME"
 
-LB_ARN="$(aws elbv2 describe-listeners --listener-arns "$LISTENER_ARN" --query 'Listeners[0].LoadBalancerArn' --output text)"
 LB_DNS="$(aws elbv2 describe-load-balancers --load-balancer-arns "$LB_ARN" --query 'LoadBalancers[0].DNSName' --output text)"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
