@@ -18,7 +18,9 @@ upstreams:
         http_statuses: [429, 500, 502, 503, 504]
   targets:
   - target: "inventario.__SERVICE_DISCOVERY_NAMESPACE__:3000"
-    weight: 100
+    weight: __INVENTARIO_STABLE_WEIGHT__
+  - target: "inventario-canary.__SERVICE_DISCOVERY_NAMESPACE__:3000"
+    weight: __INVENTARIO_CANARY_WEIGHT__
 
 - name: pedidos_upstream
   algorithm: round-robin
@@ -36,7 +38,9 @@ upstreams:
         http_statuses: [429, 500, 502, 503, 504]
   targets:
   - target: "pedidos.__SERVICE_DISCOVERY_NAMESPACE__:3000"
-    weight: 100
+    weight: __PEDIDOS_STABLE_WEIGHT__
+  - target: "pedidos-canary.__SERVICE_DISCOVERY_NAMESPACE__:3000"
+    weight: __PEDIDOS_CANARY_WEIGHT__
 
 - name: envios_upstream
   algorithm: round-robin
@@ -54,7 +58,9 @@ upstreams:
         http_statuses: [429, 500, 502, 503, 504]
   targets:
   - target: "envios.__SERVICE_DISCOVERY_NAMESPACE__:3000"
-    weight: 100
+    weight: __ENVIOS_STABLE_WEIGHT__
+  - target: "envios-canary.__SERVICE_DISCOVERY_NAMESPACE__:3000"
+    weight: __ENVIOS_CANARY_WEIGHT__
 
 - name: notificaciones_upstream
   algorithm: round-robin
@@ -72,7 +78,9 @@ upstreams:
         http_statuses: [429, 500, 502, 503, 504]
   targets:
   - target: "notificaciones.__SERVICE_DISCOVERY_NAMESPACE__:3000"
-    weight: 100
+    weight: __NOTIFICACIONES_STABLE_WEIGHT__
+  - target: "notificaciones-canary.__SERVICE_DISCOVERY_NAMESPACE__:3000"
+    weight: __NOTIFICACIONES_CANARY_WEIGHT__
 
 services:
 - name: health_service
