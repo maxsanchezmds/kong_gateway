@@ -195,6 +195,57 @@ validate_namespace() {
   done
 }
 
+validate_weight() {
+  name="$1"
+  value="$2"
+
+  case "$value" in
+    ""|*[!0-9]*)
+      log "ERROR: $name debe ser un entero entre 0 y 1000; recibido '$value'"
+      exit 1
+      ;;
+  esac
+
+  if [ "$value" -gt 1000 ]; then
+    log "ERROR: $name debe ser menor o igual a 1000; recibido '$value'"
+    exit 1
+  fi
+}
+
+render_config() {
+  namespace="$1"
+
+  inventario_stable_weight="${KONG_INVENTARIO_STABLE_WEIGHT:-100}"
+  inventario_canary_weight="${KONG_INVENTARIO_CANARY_WEIGHT:-0}"
+  pedidos_stable_weight="${KONG_PEDIDOS_STABLE_WEIGHT:-100}"
+  pedidos_canary_weight="${KONG_PEDIDOS_CANARY_WEIGHT:-0}"
+  envios_stable_weight="${KONG_ENVIOS_STABLE_WEIGHT:-100}"
+  envios_canary_weight="${KONG_ENVIOS_CANARY_WEIGHT:-0}"
+  notificaciones_stable_weight="${KONG_NOTIFICACIONES_STABLE_WEIGHT:-100}"
+  notificaciones_canary_weight="${KONG_NOTIFICACIONES_CANARY_WEIGHT:-0}"
+
+  validate_weight KONG_INVENTARIO_STABLE_WEIGHT "$inventario_stable_weight"
+  validate_weight KONG_INVENTARIO_CANARY_WEIGHT "$inventario_canary_weight"
+  validate_weight KONG_PEDIDOS_STABLE_WEIGHT "$pedidos_stable_weight"
+  validate_weight KONG_PEDIDOS_CANARY_WEIGHT "$pedidos_canary_weight"
+  validate_weight KONG_ENVIOS_STABLE_WEIGHT "$envios_stable_weight"
+  validate_weight KONG_ENVIOS_CANARY_WEIGHT "$envios_canary_weight"
+  validate_weight KONG_NOTIFICACIONES_STABLE_WEIGHT "$notificaciones_stable_weight"
+  validate_weight KONG_NOTIFICACIONES_CANARY_WEIGHT "$notificaciones_canary_weight"
+
+  sed \
+    -e "s|__SERVICE_DISCOVERY_NAMESPACE__|$namespace|g" \
+    -e "s|__INVENTARIO_STABLE_WEIGHT__|$inventario_stable_weight|g" \
+    -e "s|__INVENTARIO_CANARY_WEIGHT__|$inventario_canary_weight|g" \
+    -e "s|__PEDIDOS_STABLE_WEIGHT__|$pedidos_stable_weight|g" \
+    -e "s|__PEDIDOS_CANARY_WEIGHT__|$pedidos_canary_weight|g" \
+    -e "s|__ENVIOS_STABLE_WEIGHT__|$envios_stable_weight|g" \
+    -e "s|__ENVIOS_CANARY_WEIGHT__|$envios_canary_weight|g" \
+    -e "s|__NOTIFICACIONES_STABLE_WEIGHT__|$notificaciones_stable_weight|g" \
+    -e "s|__NOTIFICACIONES_CANARY_WEIGHT__|$notificaciones_canary_weight|g" \
+    "$TEMPLATE_PATH" > "$GENERATED_CONFIG"
+}
+
 main() {
   if [ ! -f "$TEMPLATE_PATH" ]; then
     log "ERROR: no existe plantilla en $TEMPLATE_PATH"
@@ -208,7 +259,7 @@ main() {
   namespace="$RESOLVED_NAMESPACE"
   validate_namespace "$namespace"
 
-  sed "s|__SERVICE_DISCOVERY_NAMESPACE__|$namespace|g" "$TEMPLATE_PATH" > "$GENERATED_CONFIG"
+  render_config "$namespace"
 
   kong config parse "$GENERATED_CONFIG" >/dev/null
 
